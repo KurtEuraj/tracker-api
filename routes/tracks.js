@@ -56,6 +56,7 @@ router.post("/", async (req, res) => {
     });
 
     const gptSongs = completion.choices[0].message.content
+    console.log(gptSongs)
     const splitSongs = gptSongs.split('\n')
 
     splitSongs.forEach((song) => {
@@ -73,10 +74,9 @@ router.post("/", async (req, res) => {
                     'Authorization': `Bearer ${accessToken}`,
                 }
             })
-        return response.data.tracks.items
+        return response.data.tracks.items[0].id
     }))
     res.json(allSongsData)
-    console.log(`Access Token: ${accessToken}`)
 })
 
 module.exports = router
