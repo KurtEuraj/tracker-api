@@ -67,7 +67,7 @@ router.post("/", async (req, res) => {
     console.log(songs)
 
     const allSongsData = await Promise.all(songs.map(async (songItem) => {
-        const response = await axios.get(`https://api.spotify.com/v1/search?q=track3A${songItem.song}artist%3A${songItem.artist}&type=track`,
+        const response = await axios.get(`https://api.spotify.com/v1/search?q=track3A${songItem.song}artist3A${songItem.artist}&type=track`,
             {
                 headers: {
                     'Authorization': `Bearer ${accessToken}`,
