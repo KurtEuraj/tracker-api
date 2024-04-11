@@ -27,10 +27,14 @@ const getAccessToken = async () => {
         data: "grant_type=client_credentials",
     };
 
-    const response = await axios.post(authOptions.url, authOptions.data, { headers: authOptions.headers });
-    if (response.status === 200) {
-        accessToken = response.data.access_token;
-        tokenExpiry = Date.now() + 3600000;
+    try {
+        const response = await axios.post(authOptions.url, authOptions.data, { headers: authOptions.headers });
+        if (response.status === 200) {
+            accessToken = response.data.access_token;
+            tokenExpiry = Date.now() + 3600000;
+        }
+    } catch (error) {
+        console.log(`Error obtaining Access Token ${error}`)
     }
 }
 
@@ -67,16 +71,22 @@ router.post("/", async (req, res) => {
     console.log(songs)
 
     const allSongsData = await Promise.all(songs.map(async (songItem) => {
-        const response = await axios.get(`https://api.spotify.com/v1/search?q=track3A${songItem.song}artist3A${songItem.artist}&type=track`,
-            {
-                headers: {
-                    'Authorization': `Bearer ${accessToken}`,
+        try {
+            const response = await axios.get(`https://api.spotify.com/v1/search?q=track3A${songItem.song}artist3A${songItem.artist}&type=track`,
+                {
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                    }
+                })
+            for (const track of response.data.tracks.items) {
+                if (track.name.toLowerCase().includes(songItem.song.toLowerCase().replaceAll("+", " ")) && (songItem.artist.toLowerCase().replaceAll("+", " ").includes(track.artists[0].name.toLowerCase()))) {
+                    return track.id
                 }
-            })
-        for (const track of response.data.tracks.items) {
-            if (track.name.toLowerCase().includes(songItem.song.toLowerCase().replaceAll("+", " ")) && (songItem.artist.toLowerCase().replaceAll("+", " ").includes(track.artists[0].name.toLowerCase()))) {
-                return track.id
             }
+        } catch (error) {
+            res.status(500).json({
+                message: `Error getting song data ${error}`,
+            });
         }
     }))
     const selectedSongs = allSongsData.filter((song) => song !== undefined)
@@ -88,34 +98,40 @@ router.post("/search", async (req, res) => {
         await getAccessToken()
     }
 
-    const response = await axios.get(`https://api.spotify.com/v1/search?q=track3A${req.body.search}&type=track&limit=10`,
-        {
-            headers: {
-                'Authorization': `Bearer ${accessToken}`,
-            }
-        })
-    const allSongs = response.data.tracks.items
-    const allSongsData = []
-    allSongs.forEach((song) => {
-        const songName = song.name
-        let artistsArr = []
-        let artists = ""
-        if (song.artists.length > 1) {
-            song.artists.forEach((artist) => {
-                artistsArr.push(artist.name)
+    try {
+        const response = await axios.get(`https://api.spotify.com/v1/search?q=track3A${req.body.search}&type=track&limit=10`,
+            {
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                }
             })
-            artists = artistsArr.join(", ")
-        }
-        else {
-            artists = song.artists[0].name
-        }
-        const songData = {
-            song: songName,
-            artists: artists
-        }
-        allSongsData.push(songData)
-    })
-    res.json(allSongsData)
+        const allSongs = response.data.tracks.items
+        const allSongsData = []
+        allSongs.forEach((song) => {
+            const songName = song.name
+            let artistsArr = []
+            let artists = ""
+            if (song.artists.length > 1) {
+                song.artists.forEach((artist) => {
+                    artistsArr.push(artist.name)
+                })
+                artists = artistsArr.join(", ")
+            }
+            else {
+                artists = song.artists[0].name
+            }
+            const songData = {
+                song: songName,
+                artists: artists
+            }
+            allSongsData.push(songData)
+        })
+        res.json(allSongsData)
+    } catch (error) {
+        res.status(500).json({
+            message: `Error getting song data ${error}`,
+        });
+    }
 })
 
 module.exports = router
