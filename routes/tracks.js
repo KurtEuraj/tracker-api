@@ -15,6 +15,8 @@ const format = `1. "Song Name" by Artist Name
 5. "Song Name" by Artist Name 
 6. "Song Name" by Artist Name`
 
+const formatSingle = `1. "Song Name" by Artist Name`
+
 let accessToken = ""
 let tokenExpiry = ""
 
@@ -38,39 +40,88 @@ const getAccessToken = async () => {
     }
 }
 
+// router.post("/", async (req, res) => {
+//     if (tokenExpiry <= Date.now()) {
+//         await getAccessToken()
+//     }
+
+//     const songs = []
+
+//     const completion = await openai.chat.completions.create({
+//         model: "gpt-4-turbo",
+//         messages: [
+//             { "role": "system", "content": "You are very knowledgeable about music" },
+//             { "role": "system", "content": "You reply only with the song name and artists" },
+//             { "role": "system", "content": "You don't reply with the same song that is inputted" },
+//             { "role": "system", "content": "The songs you give back must be available on Spotify" },
+//             { "role": "system", "content": `You reply only with this format ${format}` },
+//             { "role": "user", "content": "I am going to ask for song recommendations based on my favorite song" },
+//             { "role": "user", "content": `Give me 6 songs like ${req.body.song}` }]
+//     });
+
+//     const gptSongs = completion.choices[0].message.content
+//     console.log(`GPT returned songs: ${gptSongs}`)
+//     const splitSongs = gptSongs.split('\n')
+
+//     splitSongs.forEach((song) => {
+//         const parts = song.split('" by ');
+//         const songNameStr = parts[0].replace(/^\d+\.\s+\"/, '');
+//         const songName = songNameStr.replaceAll(" ", "+")
+//         const artist = parts[1].replaceAll(" ", "+");
+//         songs.push({ song: songName, artist: artist });
+//     });
+//     console.log(songs)
+
+//     const allSongsData = await Promise.all(songs.map(async (songItem) => {
+//         try {
+//             const response = await axios.get(`https://api.spotify.com/v1/search?q=track3A${songItem.song}artist3A${songItem.artist}&type=track`,
+//                 {
+//                     headers: {
+//                         'Authorization': `Bearer ${accessToken}`,
+//                     }
+//                 })
+//             for (const track of response.data.tracks.items) {
+//                 if (track.name.toLowerCase().includes(songItem.song.toLowerCase().replaceAll("+", " ")) && (songItem.artist.toLowerCase().replaceAll("+", " ").includes(track.artists[0].name.toLowerCase()))) {
+//                     return track.id
+//                 }
+//             }
+//         } catch (error) {
+//             res.status(500).json({
+//                 message: `Error getting song data ${error}`,
+//             });
+//         }
+//     }))
+//     const selectedSongs = allSongsData.filter((song) => song !== undefined)
+//     res.json(selectedSongs)
+// })
+
 router.post("/", async (req, res) => {
     if (tokenExpiry <= Date.now()) {
         await getAccessToken()
     }
 
-    const songs = []
+    let songId = undefined
 
-    const completion = await openai.chat.completions.create({
-        model: "gpt-4-turbo",
-        messages: [
-            { "role": "system", "content": "You are very knowledgeable about music" },
-            { "role": "system", "content": "You reply only with the song name and artists" },
-            { "role": "system", "content": "You don't reply with the same song that is inputted" },
-            { "role": "system", "content": "The songs you give back must be available on Spotify" },
-            { "role": "system", "content": `You reply only with this format ${format}` },
-            { "role": "user", "content": "I am going to ask for song recommendations based on my favorite song" },
-            { "role": "user", "content": `Give me 6 songs like ${req.body.song}` }]
-    });
+    while (songId === undefined) {
+        const completion = await openai.chat.completions.create({
+            model: "gpt-4-turbo",
+            messages: [
+                { "role": "system", "content": "You are very knowledgeable about music" },
+                { "role": "system", "content": "You reply only with the song name and artists" },
+                { "role": "system", "content": "You don't reply with the same song that is inputted" },
+                { "role": "system", "content": "The songs you give back must be available on Spotify" },
+                { "role": "system", "content": `You reply only with this format ${formatSingle}` },
+                { "role": "user", "content": "I am going to ask for song recommendations based on my favorite song" },
+                { "role": "user", "content": `Give me 1 song like ${req.body.song}` }]
+        });
 
-    const gptSongs = completion.choices[0].message.content
-    console.log(`GPT returned songs: ${gptSongs}`)
-    const splitSongs = gptSongs.split('\n')
-
-    splitSongs.forEach((song) => {
-        const parts = song.split('" by ');
+        const gptSong = completion.choices[0].message.content
+        const parts = gptSong.split('" by ');
         const songNameStr = parts[0].replace(/^\d+\.\s+\"/, '');
         const songName = songNameStr.replaceAll(" ", "+")
         const artist = parts[1].replaceAll(" ", "+");
-        songs.push({ song: songName, artist: artist });
-    });
-    console.log(songs)
+        const songItem = { song: songName, artist: artist };
 
-    const allSongsData = await Promise.all(songs.map(async (songItem) => {
         try {
             const response = await axios.get(`https://api.spotify.com/v1/search?q=track3A${songItem.song}artist3A${songItem.artist}&type=track`,
                 {
@@ -80,7 +131,7 @@ router.post("/", async (req, res) => {
                 })
             for (const track of response.data.tracks.items) {
                 if (track.name.toLowerCase().includes(songItem.song.toLowerCase().replaceAll("+", " ")) && (songItem.artist.toLowerCase().replaceAll("+", " ").includes(track.artists[0].name.toLowerCase()))) {
-                    return track.id
+                    songId = track.id
                 }
             }
         } catch (error) {
@@ -88,9 +139,8 @@ router.post("/", async (req, res) => {
                 message: `Error getting song data ${error}`,
             });
         }
-    }))
-    const selectedSongs = allSongsData.filter((song) => song !== undefined)
-    res.json(selectedSongs)
+    }
+    res.json(songId)
 })
 
 router.post("/search", async (req, res) => {
