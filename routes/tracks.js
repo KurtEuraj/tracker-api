@@ -1,8 +1,6 @@
 const express = require("express")
 const router = express.Router()
 require("dotenv").config()
-const PORT = process.env.PORT || 8080
-const request = require("request")
 const axios = require("axios")
 const OpenAI = require("openai")
 
@@ -33,10 +31,14 @@ const getAccessToken = async () => {
     }
 }
 
-router.post("/", async (req, res) => {
+const checkAccessToken = async () => {
     if (tokenExpiry <= Date.now()) {
         await getAccessToken()
     }
+}
+
+router.post("/", async (req, res) => {
+    await checkAccessToken()
 
     let songTitle = ""
     let songId = undefined
@@ -56,7 +58,6 @@ router.post("/", async (req, res) => {
         });
 
         const gptSong = completion.choices[0].message.content
-        console.log(gptSong)
         const parts = gptSong.split('" by ');
         const songNameStr = parts[0].replace(/^\d+\.\s+\"/, '');
         const songName = songNameStr.replaceAll(" ", "+")
@@ -90,9 +91,7 @@ router.post("/", async (req, res) => {
 })
 
 router.post("/search", async (req, res) => {
-    if (tokenExpiry <= Date.now()) {
-        await getAccessToken()
-    }
+    await checkAccessToken()
 
     try {
         const response = await axios.get(`https://api.spotify.com/v1/search?q=track3A${req.body.search}&type=track&limit=10`,
