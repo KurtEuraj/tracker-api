@@ -15,7 +15,7 @@ const getAccessToken = async () => {
     const authOptions = {
         url: 'https://accounts.spotify.com/api/token',
         headers: {
-            'Authorization': 'Basic ' + (new Buffer.from(process.env.OPENAI_CLIENT_ID + ':' + process.env.OPENAI_CLIENT_SECRET).toString('base64'))
+            'Authorization': 'Basic ' + (new Buffer.from(process.env.SPOTIFY_CLIENT_ID + ':' + process.env.SPOTIFY_CLIENT_SECRET).toString('base64'))
         },
         data: "grant_type=client_credentials",
     };
