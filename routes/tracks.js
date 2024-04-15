@@ -42,6 +42,7 @@ router.post("/", async (req, res) => {
 
     let songTitle = ""
     let songId = undefined
+    let missedSongs = []
 
     while (songId === undefined) {
         const completion = await openai.chat.completions.create({
@@ -51,6 +52,7 @@ router.post("/", async (req, res) => {
                 { "role": "system", "content": "You reply only with the song name and artists" },
                 { "role": "system", "content": "You don't reply with the same song that is inputted" },
                 { "role": "system", "content": `You never reply with these songs: ${req.body.history}` },
+                { "role": "system", "content": `You never reply with these songs: ${missedSongs}` },
                 { "role": "system", "content": "The songs you give back must be available on Spotify" },
                 { "role": "system", "content": `You reply only with this format ${formatSingle}` },
                 { "role": "user", "content": "I am going to ask for song recommendations based on my favorite song. Don't give me the same artist" },
@@ -65,17 +67,20 @@ router.post("/", async (req, res) => {
         const songItem = { song: songName, artist: artist };
 
         try {
-            const response = await axios.get(`https://api.spotify.com/v1/search?q=track3A${songItem.song}artist3A${songItem.artist}&type=track`,
+            const response = await axios.get(`https://api.spotify.com/v1/search?q=${songItem.song}+${songItem.artist}&type=track`,
                 {
                     headers: {
                         'Authorization': `Bearer ${accessToken}`,
                     }
                 })
             for (const track of response.data.tracks.items) {
-                if (track.name.toLowerCase().includes(songItem.song.toLowerCase().replaceAll("+", " ")) && (songItem.artist.toLowerCase().replaceAll("+", " ").includes(track.artists[0].name.toLowerCase()))) {
+                if (track.name.toLowerCase().replaceAll(" ", "").includes(songItem.song.toLowerCase().replaceAll("+", "")) && (songItem.artist.toLowerCase().replaceAll("+", " ").includes(track.artists[0].name.toLowerCase()))) {
                     songId = track.id
                     songTitle = songItem.song.replaceAll("+", " ")
                 }
+            }
+            if (songId === undefined) {
+                missedSongs.push(gptSong)
             }
         } catch (error) {
             res.status(500).json({
